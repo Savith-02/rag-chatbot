@@ -53,6 +53,7 @@ def ingest_pdf_bytes(file_bytes: bytes, file_name: str) -> dict:
                     page_content=chunk_text,
                     metadata={
                         "chunk_id": str(uuid.uuid4()),
+                        "source": file_name,        # Required by Milvus schema
                         "file_name": file_name,
                         "page_start": page_num,
                         "page_end": page_num,

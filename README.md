@@ -202,6 +202,36 @@ Edit `app/vectorstore.py` to configure Milvus connection:
 MILVUS_HOST = "localhost"
 MILVUS_PORT = "19530"
 COLLECTION_NAME = "financial_docs"
+EMBEDDING_DIM = 1024  # BGE-large-en embedding dimension
+```
+
+### Milvus Collection Management
+
+The collection schema is explicitly defined with the following fields:
+- `pk`: Primary key (auto-generated)
+- `vector`: Float vector (1024 dimensions for BGE-large-en)
+- `text`: Document text content
+- `source`: Source file name
+- `file_name`: Original file name
+- `chunk_id`: Unique chunk identifier
+- `page_start`, `page_end`: Page numbers
+- `chunk_index`: Chunk position in document
+- `section_type`: Type of content (text/table/etc)
+
+**Manage collection using the utility script:**
+
+```bash
+# Show collection information
+python -m app.manage_collection --info
+
+# Create collection with schema (if not exists)
+python -m app.manage_collection --create
+
+# Drop existing collection (WARNING: deletes all data)
+python -m app.manage_collection --drop
+
+# Drop and recreate collection (WARNING: deletes all data)
+python -m app.manage_collection --recreate
 ```
 
 ## Project Structure
@@ -209,14 +239,15 @@ COLLECTION_NAME = "financial_docs"
 ```
 rag-chatbot/
 ├── app/
-│   ├── config.py          # Configuration and paths
-│   ├── ingestion.py       # PDF processing and folder ingestion
-│   ├── main.py            # FastAPI app with scheduler
-│   ├── retrieval.py       # Query and search logic
-│   └── vectorstore.py     # Milvus connection
-├── raw_files/             # Folder for PDFs to process (auto-created)
-├── processed_files.txt    # Tracks processed files (auto-created)
-├── pyproject.toml         # Dependencies
+│   ├── config.py            # Configuration and paths
+│   ├── ingestion.py         # PDF processing and folder ingestion
+│   ├── main.py              # FastAPI app with scheduler
+│   ├── manage_collection.py # Milvus collection management utility
+│   ├── retrieval.py         # Query and search logic
+│   └── vectorstore.py       # Milvus connection and schema
+├── raw_files/               # Folder for PDFs to process (auto-created)
+├── processed_files.txt      # Tracks processed files (auto-created)
+├── pyproject.toml           # Dependencies
 └── README.md
 ```
 
