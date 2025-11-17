@@ -3,7 +3,7 @@
 import logging
 from typing import List, Dict, Any
 
-from pymilvus import AnnSearchRequest, RRFRanker, WeightedRanker
+from pymilvus import AnnSearchRequest, RRFRanker
 from langchain_core.documents import Document
 
 from .vectorstore import get_vectorstore, get_milvus_collection, embeddings
@@ -11,7 +11,8 @@ from .vectorstore import get_vectorstore, get_milvus_collection, embeddings
 logger = logging.getLogger(__name__)
 
 # Hybrid search parameters optimized for financial documents
-# Using Milvus native hybrid search with BM25 + dense vectors
+# Using Milvus native hybrid search with BM25 sparse + dense vectors
+# Note: BM25 is used for encoding/tokenization, IP is the distance metric for sparse vectors
 DENSE_WEIGHT = 0.6  # Semantic similarity weight
 SPARSE_WEIGHT = 0.4  # BM25 keyword matching weight
 RRF_K = 60  # Reciprocal Rank Fusion constant (lower = more weight on top results)
@@ -24,7 +25,9 @@ def hybrid_search_milvus(
 ) -> List[Dict[str, Any]]:
     """
     Perform hybrid search using Milvus native functionality.
-    Combines dense vector search + BM25 sparse search with RRF fusion.
+    Combines dense vector search + built-in BM25 text matching with RRF fusion.
+    
+    Note: Milvus automatically generates BM25 sparse vectors from query text.
     
     Args:
         query: Search query
@@ -43,9 +46,6 @@ def hybrid_search_milvus(
     # Generate dense embedding
     dense_vector = embeddings.embed_query(query)
     
-    # Milvus automatically generates BM25 sparse vectors from the text field
-    # when using SPARSE_INVERTED_INDEX with BM25 metric
-    
     # Build filter expression
     filter_expr = f'file_name == "{file_name_filter}"' if file_name_filter else ""
     
@@ -63,13 +63,13 @@ def hybrid_search_milvus(
     }
     dense_req = AnnSearchRequest(**dense_search_param)
     
-    # BM25 sparse search request
-    # Milvus BM25 uses the text field directly for tokenization
+    # BM25 sparse search request using text matching
+    # Milvus automatically converts query text to BM25 sparse vector
     sparse_search_param = {
-        "data": [query],  # Pass query text directly for BM25
+        "data": [query],  # Pass query text directly - Milvus handles BM25 encoding
         "anns_field": "sparse_vector",
         "param": {
-            "metric_type": "BM25",
+            "metric_type": "IP",  # Inner Product for sparse vectors
             "params": {},
         },
         "limit": top_k * 2,
@@ -122,7 +122,7 @@ def query_docs(
     
     Hybrid mode uses:
     - Dense vector search (COSINE similarity) for semantic understanding
-    - BM25 sparse search for exact keyword matching
+    - BM25 sparse search (IP metric) for exact keyword matching
     - RRF (Reciprocal Rank Fusion) for combining results
     
     Optimized for financial documents where both semantic and exact matching matter.
