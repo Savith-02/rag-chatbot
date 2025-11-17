@@ -137,7 +137,7 @@ def main():
             drop_collection()
             create_collection()
     elif args.drop:
-        if _confirm_destructive_action("delete all data in the collection"):
+        # if _confirm_destructive_action("delete all data in the collection"):
             drop_collection()
     elif args.create:
         create_collection()

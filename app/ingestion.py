@@ -37,7 +37,7 @@ def ingest_pdf_bytes(file_bytes: bytes, file_name: str) -> dict:
     Ingest a single PDF file (as bytes) into Milvus using langchain-milvus.
     """
 
-    logger.info(f"\n-- Ingesting PDF: {file_name} --")
+    logger.info(f"-- Ingesting PDF: {file_name} --")
     reader = PdfReader(io.BytesIO(file_bytes))
     logger.info(f"page count: {len(reader.pages)}")
     docs: List[Document] = []
@@ -72,13 +72,13 @@ def ingest_pdf_bytes(file_bytes: bytes, file_name: str) -> dict:
 
     logger.info(f"{pages_with_no_text} pages had no text extracted")
     if not docs:
-        logger.info(f"-- No text extracted from {file_name} --")
+        logger.info(f"-- No text extracted from {file_name} --\n\n")
         return {"file_name": file_name, "chunks_indexed": 0}
 
     # Insert documents with hybrid vectors (dense + sparse BM25)
     num_inserted = insert_documents_with_hybrid(docs)
 
-    logger.info(f"-- Indexed {num_inserted} chunks from {file_name} with hybrid vectors --")
+    logger.info(f"-- Indexed {num_inserted} chunks from {file_name} with hybrid vectors --\n\n")
     return {"file_name": file_name, "chunks_indexed": num_inserted}
 
 
@@ -173,6 +173,6 @@ def ingest_folder() -> Dict:
                 "file_name": file_name,
                 "error": str(e),
             })
-            logger.error(f"Failed to process file: {file_name}")
+            logger.error(f"Failed to process file: {file_name} - Error: {str(e)}", exc_info=True)
     
     return results
