@@ -1,8 +1,7 @@
 # app/ingestion.py
 
 import io
-import os
-import uuid
+import logging
 from pathlib import Path
 from typing import List, Dict, Set
 from datetime import datetime
@@ -13,6 +12,7 @@ from langchain_core.documents import Document
 from .vectorstore import get_vectorstore
 from .config import RAW_FILES_PATH, PROCESSED_FILES_TRACKER
 
+logger = logging.getLogger(__name__)
 
 def split_into_chunks(text: str, max_chars: int = 1000) -> List[str]:
     """
@@ -36,14 +36,20 @@ def ingest_pdf_bytes(file_bytes: bytes, file_name: str) -> dict:
     """
     Ingest a single PDF file (as bytes) into Milvus using langchain-milvus.
     """
-    reader = PdfReader(io.BytesIO(file_bytes))
-    docs: List[Document] = []
 
+    logger.info(f"\n-- Ingesting PDF: {file_name} --")
+    reader = PdfReader(io.BytesIO(file_bytes))
+    logger.info(f"page count: {len(reader.pages)}")
+    docs: List[Document] = []
+    pages_with_no_text = 0
     for page_index, page in enumerate(reader.pages):
         page_num = page_index + 1
         page_text = page.extract_text() or ""
         if not page_text.strip():
+            pages_with_no_text += 1
             continue
+
+        logger.info(f"Processing page {page_num}")
 
         chunks = split_into_chunks(page_text, max_chars=1000)
 
@@ -52,7 +58,7 @@ def ingest_pdf_bytes(file_bytes: bytes, file_name: str) -> dict:
                 Document(
                     page_content=chunk_text,
                     metadata={
-                        "chunk_id": str(uuid.uuid4()),
+                        "chunk_id": f"{file_name}_{page_num}_{chunk_idx}",
                         "source": file_name,        # Required by Milvus schema
                         "file_name": file_name,
                         "page_start": page_num,
@@ -64,12 +70,16 @@ def ingest_pdf_bytes(file_bytes: bytes, file_name: str) -> dict:
                 )
             )
 
+    logger.info(f"{pages_with_no_text} pages had no text extracted")
     if not docs:
+        logger.info(f"-- No text extracted from {file_name} --")
         return {"file_name": file_name, "chunks_indexed": 0}
+
 
     vectorstore = get_vectorstore()
     vectorstore.add_documents(docs)
 
+    logger.info(f"-- Indexed {len(docs)} chunks from {file_name} --")
     return {"file_name": file_name, "chunks_indexed": len(docs)}
 
 
@@ -114,6 +124,7 @@ def ingest_folder() -> Dict:
     
     # Load already processed files
     processed_files = load_processed_files()
+    logger.info(f"Loaded {len(processed_files)} processed files")
     
     # Find all PDF files in the directory
     pdf_files = list(raw_files_dir.glob("*.pdf"))
@@ -136,6 +147,7 @@ def ingest_folder() -> Dict:
         if file_name in processed_files:
             results["skipped"] += 1
             results["files_skipped"].append(file_name)
+            logger.warning(f"Skipping already processed file: {file_name}")
             continue
         
         try:
@@ -154,12 +166,14 @@ def ingest_folder() -> Dict:
                 "file_name": file_name,
                 "chunks_indexed": ingest_result["chunks_indexed"],
             })
-            
+            logger.info(f"Processed file: {file_name}")
+
         except Exception as e:
             results["failed"] += 1
             results["files_failed"].append({
                 "file_name": file_name,
                 "error": str(e),
             })
+            logger.error(f"Failed to process file: {file_name}")
     
     return results

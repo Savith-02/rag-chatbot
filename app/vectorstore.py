@@ -1,9 +1,12 @@
 # app/vectorstore.py
 
+import logging
 from typing import Optional
 from pymilvus import Collection, CollectionSchema, DataType, FieldSchema, connections, utility
 from langchain_milvus import Milvus
 from langchain_huggingface import HuggingFaceEmbeddings
+
+logger = logging.getLogger(__name__)
 
 # You can parameterize these via env vars later
 MILVUS_HOST = "localhost"
@@ -150,6 +153,8 @@ def get_vectorstore() -> Milvus:
         # Specify which fields to return
         text_field="text",
         vector_field="vector",
+        primary_field="pk",
+        auto_id=True,  # Tell LangChain that primary key is auto-generated
     )
     
     return vectorstore
