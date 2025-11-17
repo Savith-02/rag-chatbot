@@ -20,10 +20,83 @@ EMBEDDING_DIM = 1024
 embeddings = HuggingFaceEmbeddings(model_name="BAAI/bge-large-en")
 
 
+def get_milvus_collection() -> Collection:
+    """Get the Milvus collection object for direct operations."""
+    connections.connect(
+        alias="default",
+        host=MILVUS_HOST,
+        port=MILVUS_PORT,
+    )
+    return Collection(name=COLLECTION_NAME, using="default")
+
+
+def insert_documents_with_hybrid(docs: list) -> int:
+    """
+    Insert documents with both dense and sparse vectors for hybrid search.
+    
+    Args:
+        docs: List of LangChain Document objects
+    
+    Returns:
+        Number of documents inserted
+    """
+    from pymilvus.model.sparse import BM25EmbeddingFunction
+    
+    if not docs:
+        return 0
+    
+    # Get collection
+    collection = get_milvus_collection()
+    
+    # Initialize BM25 function for sparse vectors
+    bm25_ef = BM25EmbeddingFunction()
+    
+    # Prepare data for insertion
+    texts = [doc.page_content for doc in docs]
+    
+    # Generate dense embeddings
+    dense_vectors = embeddings.embed_documents(texts)
+    
+    # Generate sparse embeddings using BM25
+    # BM25 needs to be fitted on the corpus first
+    bm25_ef.fit(texts)
+    sparse_vectors = bm25_ef.encode_documents(texts)
+    
+    # Prepare entities
+    entities = []
+    for i, doc in enumerate(docs):
+        md = doc.metadata or {}
+        entity = {
+            "vector": dense_vectors[i],
+            "sparse_vector": sparse_vectors[i],
+            "text": doc.page_content,
+            "source": md.get("source", ""),
+            "file_name": md.get("file_name", ""),
+            "chunk_id": md.get("chunk_id", ""),
+            "page_start": md.get("page_start", 0),
+            "page_end": md.get("page_end", 0),
+            "chunk_index": md.get("chunk_index", 0),
+            "section_type": md.get("section_type", "text"),
+        }
+        
+        # Add optional fields if present
+        if "section_title" in md and md["section_title"]:
+            entity["section_title"] = md["section_title"]
+        
+        entities.append(entity)
+    
+    # Insert into collection
+    collection.insert(entities)
+    collection.flush()
+    
+    logger.info(f"Inserted {len(entities)} documents with hybrid vectors")
+    return len(entities)
+
+
 def create_collection_schema() -> CollectionSchema:
     """
-    Define the explicit schema for the Milvus collection.
-    Following Milvus best practices with proper field definitions.
+    Define the explicit schema for the Milvus collection with hybrid search support.
+    Includes both dense vector and sparse vector fields for BM25.
     """
     fields = [
         # Primary key - auto-generated
@@ -34,11 +107,16 @@ def create_collection_schema() -> CollectionSchema:
             auto_id=True,
             max_length=100,
         ),
-        # Vector embeddings
+        # Dense vector embeddings (semantic)
         FieldSchema(
             name="vector",
             dtype=DataType.FLOAT_VECTOR,
             dim=EMBEDDING_DIM,
+        ),
+        # Sparse vector for BM25 (keyword matching)
+        FieldSchema(
+            name="sparse_vector",
+            dtype=DataType.SPARSE_FLOAT_VECTOR,
         ),
         # Text content
         FieldSchema(
@@ -115,19 +193,31 @@ def ensure_collection_exists() -> None:
         using="default",
     )
     
-    # Create index for vector field
-    index_params = {
-        "metric_type": "COSINE",  # or "L2", "IP"
-        "index_type": "IVF_FLAT",  # or "HNSW" for better performance
+    # Create index for dense vector field
+    dense_index_params = {
+        "metric_type": "COSINE",
+        "index_type": "IVF_FLAT",
         "params": {"nlist": 1024},
     }
     
     collection.create_index(
         field_name="vector",
-        index_params=index_params,
+        index_params=dense_index_params,
     )
     
-    print(f"Collection '{COLLECTION_NAME}' created successfully with schema.")
+    # Create index for sparse vector field (BM25)
+    sparse_index_params = {
+        "index_type": "SPARSE_INVERTED_INDEX",
+        "metric_type": "BM25",
+    }
+    
+    collection.create_index(
+        field_name="sparse_vector",
+        index_params=sparse_index_params,
+    )
+    
+    logger.info(f"Collection '{COLLECTION_NAME}' created with hybrid search support (dense + sparse)")
+    print(f"Collection '{COLLECTION_NAME}' created successfully with hybrid search schema.")
 
 
 def get_vectorstore() -> Milvus:

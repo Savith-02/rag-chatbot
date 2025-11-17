@@ -28,13 +28,13 @@ async def lifespan(app: FastAPI):
     scheduler.add_job(
         func=ingest_folder,
         trigger="interval",
-        minutes=10,
+        seconds=45,
         id="folder_ingestion_job",
         name="Ingest PDFs from raw_files folder",
         replace_existing=True,
     )
     scheduler.start()
-    logger.info("Scheduler started. Folder ingestion will run every 10 minutes.")
+    logger.info("Scheduler started. Folder ingestion will run every 45 seconds.")
     
     yield
     
@@ -77,7 +77,7 @@ async def upload_file(file: UploadFile = File(...)):
     """
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported")
-    
+    logger.info(f"\n-- Uploading file: {file.filename} --")
     # Save file to raw_files directory
     raw_files_dir = Path(RAW_FILES_PATH)
     raw_files_dir.mkdir(parents=True, exist_ok=True)
@@ -95,7 +95,7 @@ async def upload_file(file: UploadFile = File(...)):
     file_bytes = await file.read()
     with open(file_path, "wb") as f:
         f.write(file_bytes)
-    
+    logger.info(f"-- File uploaded successfully: {file.filename} --")
     return {
         "status": "success",
         "message": f"File '{file.filename}' uploaded successfully",
@@ -119,17 +119,22 @@ class QueryRequest(BaseModel):
     query: str
     top_k: int = 5
     file_name: Optional[str] = None
+    use_hybrid: bool = True  # Enable hybrid search by default
 
 
 @app.post("/query")
 async def query(req: QueryRequest):
     """
     Query the indexed chunks and get results with citations.
+    Uses hybrid search (dense vector + BM25) by default for better financial document retrieval.
+    
+    Set use_hybrid=False to use dense-only vector search.
     """
     results = query_docs(
         query=req.query,
         top_k=req.top_k,
         file_name_filter=req.file_name,
+        use_hybrid=req.use_hybrid,
     )
     return {"results": results}
 
@@ -145,6 +150,6 @@ async def ingestion_status():
             "status": "active",
             "job_id": job.id,
             "next_run": job.next_run_time.isoformat() if job.next_run_time else None,
-            "interval_minutes": 10,
+            "interval_seconds": 45,
         }
     return {"status": "inactive"}
