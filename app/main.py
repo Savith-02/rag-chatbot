@@ -1,14 +1,53 @@
 # app/main.py
 
+import logging
+from pathlib import Path
 from typing import Optional
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from pydantic import BaseModel
+from apscheduler.schedulers.background import BackgroundScheduler
 
-from .ingestion import ingest_pdf_bytes
+from .ingestion import ingest_pdf_bytes, ingest_folder
 from .retrieval import query_docs
+from .config import RAW_FILES_PATH
 
-app = FastAPI(title="Financial RAG API with Milvus")
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Initialize scheduler
+scheduler = BackgroundScheduler()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage application lifecycle - start/stop scheduler"""
+    # Startup: Start the scheduler
+    logger.info("Starting background scheduler for folder ingestion...")
+    scheduler.add_job(
+        func=ingest_folder,
+        trigger="interval",
+        minutes=10,
+        id="folder_ingestion_job",
+        name="Ingest PDFs from raw_files folder",
+        replace_existing=True,
+    )
+    scheduler.start()
+    logger.info("Scheduler started. Folder ingestion will run every 10 minutes.")
+    
+    yield
+    
+    # Shutdown: Stop the scheduler
+    logger.info("Shutting down scheduler...")
+    scheduler.shutdown()
+    logger.info("Scheduler stopped.")
+
+
+app = FastAPI(
+    title="Financial RAG API with Milvus",
+    lifespan=lifespan,
+)
 
 
 @app.get("/health")
@@ -20,12 +59,59 @@ async def health():
 async def ingest_pdf(file: UploadFile = File(...)):
     """
     Upload a PDF file and index it into Milvus via langchain-milvus.
+    This directly processes the file without saving it to raw_files folder.
     """
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported")
 
     file_bytes = await file.read()
     result = ingest_pdf_bytes(file_bytes=file_bytes, file_name=file.filename)
+    return result
+
+
+@app.post("/upload_file")
+async def upload_file(file: UploadFile = File(...)):
+    """
+    Upload a PDF file to the raw_files folder.
+    The file will be processed by the scheduled ingestion task.
+    """
+    if not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files are supported")
+    
+    # Save file to raw_files directory
+    raw_files_dir = Path(RAW_FILES_PATH)
+    raw_files_dir.mkdir(parents=True, exist_ok=True)
+    
+    file_path = raw_files_dir / file.filename
+    
+    # Check if file already exists
+    if file_path.exists():
+        raise HTTPException(
+            status_code=409,
+            detail=f"File '{file.filename}' already exists in raw_files folder"
+        )
+    
+    # Write file to disk
+    file_bytes = await file.read()
+    with open(file_path, "wb") as f:
+        f.write(file_bytes)
+    
+    return {
+        "status": "success",
+        "message": f"File '{file.filename}' uploaded successfully",
+        "file_path": str(file_path),
+        "note": "File will be processed by the scheduled ingestion task"
+    }
+
+
+@app.post("/trigger_ingestion")
+async def trigger_ingestion():
+    """
+    Manually trigger the folder ingestion process.
+    This will process all unprocessed PDF files in the raw_files folder.
+    """
+    logger.info("Manual ingestion triggered via API")
+    result = ingest_folder()
     return result
 
 
@@ -46,3 +132,19 @@ async def query(req: QueryRequest):
         file_name_filter=req.file_name,
     )
     return {"results": results}
+
+
+@app.get("/ingestion_status")
+async def ingestion_status():
+    """
+    Get the status of the scheduled ingestion job.
+    """
+    job = scheduler.get_job("folder_ingestion_job")
+    if job:
+        return {
+            "status": "active",
+            "job_id": job.id,
+            "next_run": job.next_run_time.isoformat() if job.next_run_time else None,
+            "interval_minutes": 10,
+        }
+    return {"status": "inactive"}

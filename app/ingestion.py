@@ -1,13 +1,17 @@
 # app/ingestion.py
 
 import io
+import os
 import uuid
-from typing import List
+from pathlib import Path
+from typing import List, Dict, Set
+from datetime import datetime
 
 from pypdf import PdfReader
 from langchain_core.documents import Document
 
 from .vectorstore import get_vectorstore
+from .config import RAW_FILES_PATH, PROCESSED_FILES_TRACKER
 
 
 def split_into_chunks(text: str, max_chars: int = 1000) -> List[str]:
@@ -66,3 +70,95 @@ def ingest_pdf_bytes(file_bytes: bytes, file_name: str) -> dict:
     vectorstore.add_documents(docs)
 
     return {"file_name": file_name, "chunks_indexed": len(docs)}
+
+
+def load_processed_files() -> Set[str]:
+    """
+    Load the set of already-processed file names from the tracker file.
+    """
+    tracker_path = Path(PROCESSED_FILES_TRACKER)
+    if not tracker_path.exists():
+        return set()
+    
+    with open(tracker_path, "r", encoding="utf-8") as f:
+        return {line.strip() for line in f if line.strip()}
+
+
+def mark_file_as_processed(file_name: str) -> None:
+    """
+    Append a file name to the processed files tracker.
+    """
+    tracker_path = Path(PROCESSED_FILES_TRACKER)
+    with open(tracker_path, "a", encoding="utf-8") as f:
+        f.write(f"{file_name}\n")
+
+
+def ingest_folder() -> Dict:
+    """
+    Scan the RAW_FILES_PATH folder for PDF files.
+    Process only those that haven't been processed before.
+    Track processed files to avoid re-processing.
+    
+    Returns a summary of the ingestion operation.
+    """
+    raw_files_dir = Path(RAW_FILES_PATH)
+    if not raw_files_dir.exists():
+        return {
+            "status": "error",
+            "message": f"Raw files directory does not exist: {RAW_FILES_PATH}",
+            "processed": 0,
+            "skipped": 0,
+            "failed": 0,
+        }
+    
+    # Load already processed files
+    processed_files = load_processed_files()
+    
+    # Find all PDF files in the directory
+    pdf_files = list(raw_files_dir.glob("*.pdf"))
+    
+    results = {
+        "status": "success",
+        "timestamp": datetime.now().isoformat(),
+        "processed": 0,
+        "skipped": 0,
+        "failed": 0,
+        "files_processed": [],
+        "files_skipped": [],
+        "files_failed": [],
+    }
+    
+    for pdf_path in pdf_files:
+        file_name = pdf_path.name
+        
+        # Skip if already processed
+        if file_name in processed_files:
+            results["skipped"] += 1
+            results["files_skipped"].append(file_name)
+            continue
+        
+        try:
+            # Read and process the file
+            with open(pdf_path, "rb") as f:
+                file_bytes = f.read()
+            
+            # Ingest the PDF
+            ingest_result = ingest_pdf_bytes(file_bytes=file_bytes, file_name=file_name)
+            
+            # Mark as processed
+            mark_file_as_processed(file_name)
+            
+            results["processed"] += 1
+            results["files_processed"].append({
+                "file_name": file_name,
+                "chunks_indexed": ingest_result["chunks_indexed"],
+            })
+            
+        except Exception as e:
+            results["failed"] += 1
+            results["files_failed"].append({
+                "file_name": file_name,
+                "error": str(e),
+            })
+    
+    return results
