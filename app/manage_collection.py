@@ -5,6 +5,7 @@ Usage:
     python -m app.manage_collection --drop    # Drop existing collection
     python -m app.manage_collection --create  # Create collection with schema
     python -m app.manage_collection --info    # Show collection info
+    python -m app.manage_collection --reset   # Drop and recreate collection
 """
 
 import argparse
@@ -41,6 +42,17 @@ def drop_collection():
 def create_collection():
     """Create collection with proper schema"""
     connect_to_milvus()
+    ensure_collection_exists()
+
+def reset_collection():
+    """Drop the existing collection and recreate"""
+    connect_to_milvus()
+    
+    if utility.has_collection(COLLECTION_NAME):
+        utility.drop_collection(COLLECTION_NAME)
+        print(f"Collection '{COLLECTION_NAME}' dropped successfully.")
+    else:
+        print(f"Collection '{COLLECTION_NAME}' does not exist.")
     ensure_collection_exists()
 
 
@@ -143,6 +155,8 @@ def main():
         create_collection()
     elif args.info:
         show_collection_info()
+    elif args.reset:
+        reset_collection()
     else:
         parser.print_help()
 

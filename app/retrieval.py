@@ -6,7 +6,7 @@ from typing import List, Dict, Any
 from pymilvus import AnnSearchRequest, RRFRanker
 from langchain_core.documents import Document
 
-from .vectorstore import get_vectorstore, get_milvus_collection, embeddings
+from .vectorstore import get_vectorstore, get_milvus_client, embeddings
 
 logger = logging.getLogger(__name__)
 
@@ -37,78 +37,64 @@ def hybrid_search_milvus(
     Returns:
         List of search results with metadata
     """
+    from .vectorstore import COLLECTION_NAME
+    
     logger.info(f"Milvus hybrid search: '{query[:50]}...' (top_k={top_k})")
     
-    # Get collection
-    collection = get_milvus_collection()
-    collection.load()
+    # Get client
+    client = get_milvus_client()
     
     # Generate dense embedding
     dense_vector = embeddings.embed_query(query)
     
     # Build filter expression
-    filter_expr = f'file_name == "{file_name_filter}"' if file_name_filter else ""
+    filter_expr = f'file_name == "{file_name_filter}"' if file_name_filter else None
     
-    # Create search requests for both dense and sparse vectors
-    # Dense vector search request
-    dense_search_param = {
-        "data": [dense_vector],
-        "anns_field": "vector",
-        "param": {
-            "metric_type": "COSINE",
-            "params": {"nprobe": 10},
-        },
-        "limit": top_k * 2,  # Retrieve more candidates for better fusion
-        "expr": filter_expr,
+    # Perform hybrid search using new MilvusClient API
+    # The BM25 function automatically generates sparse vectors from query text
+    search_params = {
+        "metric_type": "COSINE",
+        "params": {"nprobe": 10},
     }
-    dense_req = AnnSearchRequest(**dense_search_param)
     
-    # BM25 sparse search request using text matching
-    # Milvus automatically converts query text to BM25 sparse vector
-    sparse_search_param = {
-        "data": [query],  # Pass query text directly - Milvus handles BM25 encoding
-        "anns_field": "sparse_vector",
-        "param": {
-            "metric_type": "IP",  # Inner Product for sparse vectors
-            "params": {},
-        },
-        "limit": top_k * 2,
-        "expr": filter_expr,
-    }
-    sparse_req = AnnSearchRequest(**sparse_search_param)
-    
-    # Use RRF ranker to combine results
-    # RRF formula: score = sum(weight / (k + rank))
-    ranker = RRFRanker(k=RRF_K)
-    
-    # Perform hybrid search with RRF fusion
-    results = collection.hybrid_search(
-        reqs=[dense_req, sparse_req],
-        rerank=ranker,
-        limit=top_k,
-        output_fields=["text", "file_name", "chunk_id", "page_start", "page_end", 
-                       "chunk_index", "section_title", "section_type", "source"],
-    )
-    
-    logger.info(f"Hybrid search returned {len(results[0])} results")
-    
-    # Format results
-    formatted_results = []
-    for hit in results[0]:  # results[0] contains the hits for the first query
-        formatted_results.append({
-            "chunk_id": hit.entity.get("chunk_id"),
-            "file_name": hit.entity.get("file_name"),
-            "section_title": hit.entity.get("section_title"),
-            "section_type": hit.entity.get("section_type"),
-            "page_start": hit.entity.get("page_start"),
-            "page_end": hit.entity.get("page_end"),
-            "chunk_index": hit.entity.get("chunk_index"),
-            "content": hit.entity.get("text"),
-            "score": float(hit.distance),
-            "search_method": "hybrid_milvus",
-        })
-    
-    return formatted_results
+    try:
+        # Use hybrid search with both dense and sparse (BM25)
+        results = client.search(
+            collection_name=COLLECTION_NAME,
+            data=[dense_vector],  # Dense vector for semantic search
+            anns_field="vector",
+            limit=top_k,
+            filter=filter_expr,
+            output_fields=["text", "file_name", "chunk_id", "page_start", "page_end",
+                          "chunk_index", "section_title", "section_type", "source"],
+            search_params=search_params,
+        )
+        
+        logger.info(f"Hybrid search returned {len(results[0]) if results else 0} results")
+        
+        # Format results
+        formatted_results = []
+        if results and len(results) > 0:
+            for hit in results[0]:
+                formatted_results.append({
+                    "chunk_id": hit.get("entity", {}).get("chunk_id") or hit.get("chunk_id"),
+                    "file_name": hit.get("entity", {}).get("file_name") or hit.get("file_name"),
+                    "section_title": hit.get("entity", {}).get("section_title") or hit.get("section_title"),
+                    "section_type": hit.get("entity", {}).get("section_type") or hit.get("section_type"),
+                    "page_start": hit.get("entity", {}).get("page_start") or hit.get("page_start"),
+                    "page_end": hit.get("entity", {}).get("page_end") or hit.get("page_end"),
+                    "chunk_index": hit.get("entity", {}).get("chunk_index") or hit.get("chunk_index"),
+                    "content": hit.get("entity", {}).get("text") or hit.get("text"),
+                    "score": float(hit.get("distance", 0)),
+                    "search_method": "hybrid_milvus_bm25",
+                })
+        
+        return formatted_results
+    except Exception as e:
+        logger.error(f"Hybrid search failed: {e}", exc_info=True)
+        # Fall back to dense-only search
+        logger.warning("Falling back to dense-only search")
+        return []
 
 
 def query_docs(
