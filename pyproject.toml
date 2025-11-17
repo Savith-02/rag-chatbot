@@ -1,0 +1,21 @@
+[project]
+name = "rag-chatbot"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10,<4.0"
+dependencies = [
+    "fastapi>=0.121.2",
+    "langchain-core>=0.3.79",
+    "langchain-huggingface>=0.3.1",
+    "langchain-milvus>=0.2.1",
+    "numpy<2",
+    "pymilvus>=2.6.3",
+    "pypdf>=6.2.0",
+    "python-dotenv>=1.2.1",
+    "python-multipart>=0.0.20",
+    "sentence-transformers>=5.1.2",
+    "torch==2.3.0",
+    "transformers>=4.57.1",
+    "uvicorn[standard]>=0.38.0",
+]

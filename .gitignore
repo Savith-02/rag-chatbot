@@ -1,0 +1,5 @@
+.env
+.venv
+notes.md
+*__pycache__
+PDFs
