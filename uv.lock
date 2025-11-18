@@ -1597,7 +1597,7 @@ requires-dist = [
     { name = "langchain-core", specifier = ">=0.3.79" },
     { name = "langchain-huggingface", specifier = ">=0.3.1" },
     { name = "langchain-milvus", specifier = ">=0.2.1" },
-    { name = "langchain-openai", specifier = ">=1.0.3" },
+    { name = "langchain-openai", specifier = ">=0.3.29" },
     { name = "numpy", specifier = "<2" },
     { name = "pymilvus", extras = ["model"], specifier = ">=2.6.3" },
     { name = "pypdf", specifier = ">=6.2.0" },

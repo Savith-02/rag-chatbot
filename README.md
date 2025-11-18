@@ -64,44 +64,11 @@ curl -X POST http://localhost:8000/upload_file \
   -F "file=@/path/to/document.pdf"
 ```
 
-Response:
-```json
-{
-  "status": "success",
-  "message": "File 'document.pdf' uploaded successfully",
-  "file_path": "/path/to/raw_files/document.pdf",
-  "note": "File will be processed by the scheduled ingestion task"
-}
-```
-
 ### 3. Trigger Manual Ingestion
 Manually trigger the folder ingestion process to process all unprocessed PDFs immediately.
 
 ```bash
 curl -X POST http://localhost:8000/trigger_ingestion
-```
-
-Response:
-```json
-{
-  "status": "success",
-  "timestamp": "2024-11-17T10:30:00.123456",
-  "processed": 2,
-  "skipped": 1,
-  "failed": 0,
-  "files_processed": [
-    {
-      "file_name": "report1.pdf",
-      "chunks_indexed": 45
-    },
-    {
-      "file_name": "report2.pdf",
-      "chunks_indexed": 32
-    }
-  ],
-  "files_skipped": ["already_processed.pdf"],
-  "files_failed": []
-}
 ```
 
 ### 4. Direct PDF Ingestion (Immediate Processing)
@@ -110,14 +77,6 @@ Upload and immediately process a PDF without saving to the raw_files folder.
 ```bash
 curl -X POST http://localhost:8000/ingest_pdf \
   -F "file=@/path/to/document.pdf"
-```
-
-Response:
-```json
-{
-  "file_name": "document.pdf",
-  "chunks_indexed": 45
-}
 ```
 
 ### 5. Query Documents
@@ -133,26 +92,6 @@ curl -X POST http://localhost:8000/query \
   }'
 ```
 
-Response:
-```json
-{
-  "results": [
-    {
-      "chunk_id": "report.pdf_5_2",
-      "file_name": "report.pdf",
-      "section_title": "Financial Results",
-      "section_type": "text",
-      "page_start": 5,
-      "page_end": 5,
-      "chunk_index": 2,
-      "content": "Q4 financial projections show...",
-      "score": 0.89,
-      "search_method": "dense_only"
-    }
-  ]
-}
-```
-
 ### 6. Check Ingestion Status
 Get the status of the scheduled ingestion job.
 
@@ -160,14 +99,16 @@ Get the status of the scheduled ingestion job.
 curl http://localhost:8000/ingestion_status
 ```
 
-Response:
-```json
-{
-  "status": "active",
-  "job_id": "folder_ingestion_job",
-  "next_run": "2024-11-17T10:40:00",
-  "interval_minutes": 10
-}
+### 7. Chat with RAG
+
+```bash
+curl -X POST http://localhost:8000/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "What are the financial projections for Q4?",
+    "top_k": 5,
+    "file_name": "report.pdf"
+  }'
 ```
 
 ## How It Works
@@ -244,33 +185,11 @@ python -m app.manage_collection --drop
 python -m app.manage_collection --recreate
 ```
 
-## Project Structure
-
-```
-rag-chatbot/
-├── app/
-│   ├── config.py            # Configuration and paths
-│   ├── ingestion.py         # PDF processing and folder ingestion
-│   ├── main.py              # FastAPI app with scheduler
-│   ├── manage_collection.py # Milvus collection management utility
-│   ├── retrieval.py         # Query and search logic
-│   └── vectorstore.py       # Milvus connection and schema
-├── raw_files/               # Folder for PDFs to process (auto-created)
-├── processed_files.txt      # Tracks processed files (auto-created)
-├── pyproject.toml           # Dependencies
-└── README.md
-```
-
 ## Development
 
 ### Install Dependencies
 ```bash
 uv sync
-```
-
-### Run Tests
-```bash
-pytest tests/
 ```
 
 ### API Documentation
