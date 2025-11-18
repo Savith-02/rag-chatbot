@@ -5,7 +5,7 @@ Usage:
     python -m app.manage_collection --drop    # Drop existing collection
     python -m app.manage_collection --create  # Create collection with schema
     python -m app.manage_collection --info    # Show collection info
-    python -m app.manage_collection --reset   # Drop and recreate collection
+    python -m app.manage_collection --recreate   # Drop and recreate collection
 """
 
 import argparse
@@ -44,7 +44,7 @@ def create_collection():
     connect_to_milvus()
     ensure_collection_exists()
 
-def reset_collection():
+def recreate_collection():
     """Drop the existing collection and recreate"""
     connect_to_milvus()
     
@@ -106,17 +106,6 @@ def show_collection_info():
     
     print(f"{separator}\n")
 
-
-def _confirm_destructive_action(action: str) -> bool:
-    """Prompt user to confirm destructive action"""
-    print(f"WARNING: This will {action}!")
-    confirm = input(f"Type 'yes' to confirm dropping '{COLLECTION_NAME}': ")
-    if confirm.lower() == 'yes':
-        return True
-    print("Operation cancelled.")
-    return False
-
-
 def main():
     parser = argparse.ArgumentParser(
         description="Manage Milvus collection for RAG chatbot"
@@ -145,18 +134,14 @@ def main():
     args = parser.parse_args()
     
     if args.recreate:
-        if _confirm_destructive_action("delete all data in the collection"):
-            drop_collection()
-            create_collection()
+        drop_collection()
+        create_collection()
     elif args.drop:
-        # if _confirm_destructive_action("delete all data in the collection"):
-            drop_collection()
+        drop_collection()
     elif args.create:
         create_collection()
     elif args.info:
         show_collection_info()
-    elif args.reset:
-        reset_collection()
     else:
         parser.print_help()
 

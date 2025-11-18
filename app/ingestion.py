@@ -9,7 +9,7 @@ from datetime import datetime
 from pypdf import PdfReader
 from langchain_core.documents import Document
 
-from .vectorstore import get_vectorstore, insert_documents_with_hybrid
+from .vectorstore import get_vectorstore, insert_documents
 from .config import RAW_FILES_PATH, PROCESSED_FILES_TRACKER
 
 logger = logging.getLogger(__name__)
@@ -75,10 +75,10 @@ def ingest_pdf_bytes(file_bytes: bytes, file_name: str) -> dict:
         logger.info(f"-- No text extracted from {file_name} --\n\n")
         return {"file_name": file_name, "chunks_indexed": 0}
 
-    # Insert documents with hybrid vectors (dense + sparse BM25)
-    num_inserted = insert_documents_with_hybrid(docs)
+    # Insert documents with dense vectors
+    num_inserted = insert_documents(docs)
 
-    logger.info(f"-- Indexed {num_inserted} chunks from {file_name} with hybrid vectors --\n\n")
+    logger.info(f"-- Indexed {num_inserted} chunks from {file_name} with dense vectors --\n\n")
     return {"file_name": file_name, "chunks_indexed": num_inserted}
 
 

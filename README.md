@@ -9,7 +9,7 @@ A Financial RAG (Retrieval-Augmented Generation) API that processes PDF document
 - **Manual Trigger**: Manually trigger ingestion on-demand via API
 - **Processed File Tracking**: Remembers which files have been processed to avoid re-processing
 - **Direct PDF Ingestion**: Upload and immediately process PDFs without saving to folder
-- **Semantic Search**: Query indexed documents using natural language
+- **Semantic Search**: Dense vector search using BGE-large-en embeddings for semantic similarity
 
 ## Setup
 
@@ -121,7 +121,7 @@ Response:
 ```
 
 ### 5. Query Documents
-Search indexed documents using natural language queries.
+Search indexed documents using natural language queries with semantic vector search.
 
 ```bash
 curl -X POST http://localhost:8000/query \
@@ -138,13 +138,16 @@ Response:
 {
   "results": [
     {
+      "chunk_id": "report.pdf_5_2",
+      "file_name": "report.pdf",
+      "section_title": "Financial Results",
+      "section_type": "text",
+      "page_start": 5,
+      "page_end": 5,
+      "chunk_index": 2,
       "content": "Q4 financial projections show...",
-      "metadata": {
-        "file_name": "report.pdf",
-        "page_start": 5,
-        "chunk_index": 2
-      },
-      "score": 0.89
+      "score": 0.89,
+      "search_method": "dense_only"
     }
   ]
 }
@@ -176,9 +179,16 @@ Response:
 3. **Processing**: For each new file:
    - Extracts text from PDF pages
    - Chunks text into ~1000 character segments
-   - Generates embeddings using `BAAI/bge-large-en`
-   - Stores in Milvus with metadata (file name, page number, chunk index)
+   - Generates dense embeddings using `BAAI/bge-large-en`
+   - Stores vectors in Milvus with metadata (file name, page number, chunk index)
 4. **Tracking Update**: Marks processed files in `processed_files.txt`
+
+### Search Workflow
+
+1. **Query Processing**: User submits query
+2. **Vector Generation**: Generate BGE embedding for query
+3. **Milvus Search**: Execute semantic similarity search on dense vector field
+4. **Results**: Return ranked results with metadata and scores
 
 ### File Upload Workflow
 

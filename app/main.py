@@ -119,22 +119,18 @@ class QueryRequest(BaseModel):
     query: str
     top_k: int = 5
     file_name: Optional[str] = None
-    use_hybrid: bool = True  # Enable hybrid search by default
 
 
 @app.post("/query")
 async def query(req: QueryRequest):
     """
     Query the indexed chunks and get results with citations.
-    Uses hybrid search (dense vector + BM25) by default for better financial document retrieval.
-    
-    Set use_hybrid=False to use dense-only vector search.
+    Uses dense vector search (semantic similarity) with BGE-large-en embeddings.
     """
     results = query_docs(
         query=req.query,
         top_k=req.top_k,
         file_name_filter=req.file_name,
-        use_hybrid=req.use_hybrid,
     )
     return {"results": results}
 
