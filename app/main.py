@@ -26,15 +26,20 @@ scheduler = BackgroundScheduler()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Manage application lifecycle - start/stop scheduler"""
+    """Manage application lifecycle - setup resources and start/stop scheduler"""
+    # Startup: Initialize Milvus collection
+    logger.info("Initializing Milvus collection...")
+    ensure_collection_exists()
+    logger.info("Milvus collection ready.")
+    
     # Startup: Start the scheduler
     logger.info("Starting background scheduler for folder ingestion...")
     scheduler.add_job(
         func=ingest_folder,
         trigger="interval",
-        seconds=45,
+        seconds=20,
         id="folder_ingestion_job",
-        name="Ingest PDFs from raw_files folder",
+        name="Ingest PDFs from sources folder",
         replace_existing=True,
     )
     scheduler.start()

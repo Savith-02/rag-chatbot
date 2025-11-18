@@ -2,6 +2,7 @@
 
 import io
 import logging
+import threading
 from pathlib import Path
 from typing import List, Dict, Set
 from datetime import datetime
@@ -14,6 +15,9 @@ from .vectorstore import get_vectorstore, insert_documents
 from .config import RAW_FILES_PATH, PROCESSED_FILES_TRACKER
 
 logger = logging.getLogger(__name__)
+
+# Lock to prevent concurrent folder ingestion
+_ingestion_lock = threading.Lock()
 
 def split_into_chunks(text: str, chunk_size: int = 600, chunk_overlap: int = 100) -> List[str]:
     """
@@ -62,9 +66,7 @@ def ingest_pdf_bytes(file_bytes: bytes, file_name: str) -> dict:
             pages_with_no_text += 1
             continue
 
-        logger.info(f"Processing page {page_num}")
-
-        chunks = split_into_chunks(page_text, chunk_size=600, chunk_overlap=100)
+        chunks = split_into_chunks(page_text, chunk_size=600, chunk_overlap=80)
 
         for chunk_idx, chunk_text in enumerate(chunks):
             docs.append(
@@ -121,16 +123,34 @@ def ingest_folder() -> Dict:
     Process only those that haven't been processed before.
     Track processed files to avoid re-processing.
     
+    Thread-safe: Uses a lock to prevent concurrent executions.
+    
     Returns a summary of the ingestion operation.
+    """
+    # Try to acquire lock, skip if already running
+    if not _ingestion_lock.acquire(blocking=False):
+        logger.warning("Ingestion already in progress, skipping this run")
+        return {
+            "status": "skipped",
+            "message": "Previous ingestion still running",
+        }
+    
+    try:
+        return _ingest_folder_impl()
+    finally:
+        _ingestion_lock.release()
+
+
+def _ingest_folder_impl() -> Dict:
+    """
+    Internal implementation of folder ingestion.
+    Should only be called by ingest_folder() which handles locking.
     """
     raw_files_dir = Path(RAW_FILES_PATH)
     if not raw_files_dir.exists():
         return {
             "status": "error",
             "message": f"Raw files directory does not exist: {RAW_FILES_PATH}",
-            "processed": 0,
-            "skipped": 0,
-            "failed": 0,
         }
     
     # Load already processed files
