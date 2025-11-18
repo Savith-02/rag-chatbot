@@ -193,12 +193,9 @@ def ensure_collection_exists() -> None:
 def get_vectorstore() -> Milvus:
     """
     Creates (or returns) a Milvus-backed LangChain VectorStore.
-    Ensures the collection exists with proper schema before returning.
+    Note: Collection must be initialized at startup via ensure_collection_exists().
     Note: LangChain integration still uses connection_args format.
     """
-    # Ensure collection exists with proper schema
-    ensure_collection_exists()
-    
     vectorstore = Milvus(
         embedding_function=embeddings,
         collection_name=COLLECTION_NAME,

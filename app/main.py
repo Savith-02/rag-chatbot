@@ -15,6 +15,7 @@ from .ingestion import ingest_pdf_bytes, ingest_folder
 from .retrieval import query_docs
 from .rag_chain import answer_question
 from .config import RAW_FILES_PATH, BASE_DIR
+from .vectorstore import ensure_collection_exists
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

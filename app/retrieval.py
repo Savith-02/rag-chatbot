@@ -57,7 +57,6 @@ def query_docs(
                 "chunk_index": md.get("chunk_index"),
                 "content": doc.page_content,
                 "score": float(score),
-                "search_method": "dense_only",
             }
         )
     

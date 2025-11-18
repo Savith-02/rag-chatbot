@@ -8,27 +8,40 @@ from datetime import datetime
 
 from pypdf import PdfReader
 from langchain_core.documents import Document
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from .vectorstore import get_vectorstore, insert_documents
 from .config import RAW_FILES_PATH, PROCESSED_FILES_TRACKER
 
 logger = logging.getLogger(__name__)
 
-def split_into_chunks(text: str, max_chars: int = 1000) -> List[str]:
+def split_into_chunks(text: str, chunk_size: int = 600, chunk_overlap: int = 100) -> List[str]:
     """
-    Very simple char-based splitter.
-    Replace with a smarter section-aware splitter later.
+    Split text into chunks using LangChain's RecursiveCharacterTextSplitter.
+    This splitter respects semantic boundaries (paragraphs, sentences, words)
+    and includes overlap between chunks for better context preservation.
+    
+    Args:
+        text: The text to split
+        chunk_size: Maximum size of each chunk
+        chunk_overlap: Number of characters to overlap between chunks
+    
+    Returns:
+        List of text chunks
     """
     text = text.strip()
     if not text:
         return []
-
-    chunks = []
-    start = 0
-    while start < len(text):
-        end = min(start + max_chars, len(text))
-        chunks.append(text[start:end])
-        start = end
+    
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+        length_function=len,
+        separators=["\n\n", "\n", ". ", " ", ""],
+        is_separator_regex=False,
+    )
+    
+    chunks = text_splitter.split_text(text)
     return chunks
 
 
@@ -51,7 +64,7 @@ def ingest_pdf_bytes(file_bytes: bytes, file_name: str) -> dict:
 
         logger.info(f"Processing page {page_num}")
 
-        chunks = split_into_chunks(page_text, max_chars=1000)
+        chunks = split_into_chunks(page_text, chunk_size=600, chunk_overlap=100)
 
         for chunk_idx, chunk_text in enumerate(chunks):
             docs.append(
@@ -59,7 +72,7 @@ def ingest_pdf_bytes(file_bytes: bytes, file_name: str) -> dict:
                     page_content=chunk_text,
                     metadata={
                         "chunk_id": f"{file_name}_{page_num}_{chunk_idx}",
-                        "source": file_name,        # Required by Milvus schema
+                        "source": file_name,      
                         "file_name": file_name,
                         "page_start": page_num,
                         "page_end": page_num,
@@ -70,7 +83,6 @@ def ingest_pdf_bytes(file_bytes: bytes, file_name: str) -> dict:
                 )
             )
 
-    logger.info(f"{pages_with_no_text} pages had no text extracted")
     if not docs:
         logger.info(f"-- No text extracted from {file_name} --\n\n")
         return {"file_name": file_name, "chunks_indexed": 0}

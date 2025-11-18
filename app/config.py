@@ -11,7 +11,7 @@ load_dotenv()
 BASE_DIR = Path(__file__).parent.parent
 
 # Directory where raw PDF files are stored
-RAW_FILES_PATH = os.getenv("RAW_FILES_PATH", str(BASE_DIR / "raw_files"))
+RAW_FILES_PATH = os.getenv("RAW_FILES_PATH", str(BASE_DIR / "sources"))
 
 # File to track which files have been processed
 PROCESSED_FILES_TRACKER = os.getenv(
