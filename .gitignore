@@ -2,7 +2,5 @@
 .venv
 notes.md
 *__pycache__
-PDFs
 processed_files.txt
-Processed_PDFs
 *.md
