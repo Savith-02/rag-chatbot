@@ -16,6 +16,7 @@ from .retrieval import query_docs
 from .rag_chain import answer_question
 from .config import RAW_FILES_PATH, BASE_DIR
 from .vectorstore import ensure_collection_exists
+from .spreadsheet_logger import initialize_spreadsheet, get_performance_stats
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -31,6 +32,11 @@ async def lifespan(app: FastAPI):
     logger.info("Initializing Milvus collection...")
     ensure_collection_exists()
     logger.info("Milvus collection ready.")
+    
+    # Startup: Initialize spreadsheet for performance logging
+    logger.info("Initializing performance logging spreadsheet...")
+    initialize_spreadsheet()
+    logger.info("Spreadsheet ready.")
     
     # Startup: Start the scheduler
     logger.info("Starting background scheduler for folder ingestion...")
@@ -223,4 +229,19 @@ async def get_processed_files():
         return {"files": file_names}
     except Exception as e:
         logger.error(f"Error getting processed files: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/performance_stats")
+async def performance_stats():
+    """
+    Get performance statistics from the spreadsheet.
+    """
+    try:
+        stats = get_performance_stats()
+        if stats is None:
+            return {"message": "No performance data available"}
+        return stats
+    except Exception as e:
+        logger.error(f"Error getting performance stats: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))

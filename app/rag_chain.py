@@ -1,6 +1,7 @@
 # app/rag_chain.py
 
 import logging
+import time
 from typing import List, Dict, Any, Optional
 
 from langchain_openai import ChatOpenAI
@@ -10,6 +11,7 @@ from langchain_core.runnables import RunnablePassthrough
 
 from .config import OPENAI_API_KEY, LLM_MODEL, LLM_TEMPERATURE
 from .retrieval import query_docs
+from .spreadsheet_logger import log_rag_performance
 
 logger = logging.getLogger(__name__)
 
@@ -121,14 +123,32 @@ def answer_question(
     
     # Step 1: Retrieve relevant documents
     logger.debug(f"Retrieving top {top_k} documents...")
+    retrieval_start_time = time.time()
+    
     retrieved_docs = query_docs(
         query=question,
         top_k=top_k,
         file_name_filter=file_name_filter,
     )
     
+    retrieval_end_time = time.time()
+    retrieval_time = retrieval_end_time - retrieval_start_time
+    
+    logger.info(f"Document retrieval completed in {retrieval_time:.3f}s")
+    
     if not retrieved_docs:
         logger.warning("No documents retrieved for the question")
+        
+        # Log to spreadsheet even for failed retrievals
+        log_rag_performance(
+            question=question,
+            generated_answer="No relevant documents found",
+            retrieval_time=retrieval_time,
+            generation_time=0,
+            num_documents_retrieved=0,
+            status="no_documents_found"
+        )
+        
         return {
             "answer": "I couldn't find any relevant information in the knowledge base to answer your question.",
             "sources": [],
@@ -139,6 +159,8 @@ def answer_question(
     
     # Step 2: Generate answer using LLM
     logger.debug("Generating answer with LLM...")
+    generation_start_time = time.time()
+    
     rag_chain = create_rag_chain()
     
     try:
@@ -147,7 +169,21 @@ def answer_question(
             "retrieved_docs": retrieved_docs,
         })
         
-        logger.info("Successfully generated answer")
+        generation_end_time = time.time()
+        generation_time = generation_end_time - generation_start_time
+        
+        logger.info(f"Answer generation completed in {generation_time:.3f}s")
+        logger.info(f"Total RAG request completed in {retrieval_time + generation_time:.3f}s")
+        
+        # Log to spreadsheet
+        log_rag_performance(
+            question=question,
+            generated_answer=answer,
+            retrieval_time=retrieval_time,
+            generation_time=generation_time,
+            num_documents_retrieved=len(retrieved_docs),
+            status="success"
+        )
         
         # Format sources for response
         sources = [
@@ -167,8 +203,26 @@ def answer_question(
             "sources": sources,
             "question": question,
             "num_sources": len(sources),
+            "timing": {
+                "retrieval_time_seconds": round(retrieval_time, 3),
+                "generation_time_seconds": round(generation_time, 3),
+                "total_time_seconds": round(retrieval_time + generation_time, 3)
+            }
         }
     
     except Exception as e:
+        generation_end_time = time.time()
+        generation_time = generation_end_time - generation_start_time
+        
+        # Log error to spreadsheet
+        log_rag_performance(
+            question=question,
+            generated_answer=f"Error: {str(e)}",
+            retrieval_time=retrieval_time,
+            generation_time=generation_time,
+            num_documents_retrieved=len(retrieved_docs),
+            status="error"
+        )
+        
         logger.error(f"Error generating answer: {str(e)}", exc_info=True)
         raise

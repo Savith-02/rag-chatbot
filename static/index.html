@@ -303,6 +303,58 @@
             font-weight: 500;
             font-size: 0.9rem;
         }
+
+        .timing-display {
+            background: #0a0a0a;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            border: 1px solid #2a2a2a;
+        }
+
+        .timing-display h3 {
+            color: #ff8c00;
+            margin-bottom: 15px;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .timing-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+        }
+
+        .timing-item {
+            background: #1a1a1a;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid #2a2a2a;
+            transition: border-color 0.3s;
+        }
+
+        .timing-item:hover {
+            border-color: #ff8c0050;
+        }
+
+        .timing-value {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #ff8c00;
+            margin-bottom: 5px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .timing-label {
+            font-size: 0.8rem;
+            color: #999;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            font-weight: 500;
+        }
     </style>
 </head>
 <body>
@@ -362,6 +414,24 @@
                 <div class="answer-display">
                     <h3>Answer</h3>
                     <p id="answerDisplay"></p>
+                </div>
+
+                <div id="timingDisplay" class="timing-display" style="display: none;">
+                    <h3>Performance Metrics</h3>
+                    <div class="timing-grid">
+                        <div class="timing-item">
+                            <div class="timing-value" id="retrievalTime">-</div>
+                            <div class="timing-label">Retrieval</div>
+                        </div>
+                        <div class="timing-item">
+                            <div class="timing-value" id="generationTime">-</div>
+                            <div class="timing-label">Generation</div>
+                        </div>
+                        <div class="timing-item">
+                            <div class="timing-value" id="totalTime">-</div>
+                            <div class="timing-label">Total</div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="sources-section">
@@ -494,7 +564,7 @@
             // Display question (only for chat mode)
             const questionElement = document.getElementById('questionDisplay').parentElement;
             
-            questionElement.style.display = 'none';
+                questionElement.style.display = 'none';
         
 
             // Display answer (only for chat mode)
@@ -510,6 +580,9 @@
             const numSources = sources ? sources.length : 0;
             document.getElementById('totalSources').textContent = numSources;
             document.getElementById('totalSourcesNav').textContent = numSources;
+
+            // Display timing information if available
+            displayTiming();
 
             // Display current source
             displayCurrentSource();
@@ -566,6 +639,22 @@
             
             currentSourceIndex = (currentSourceIndex - 1 + sources.length) % sources.length;
             displayCurrentSource();
+        }
+
+        function displayTiming() {
+            const timingElement = document.getElementById('timingDisplay');
+            
+            if (currentData && currentData.timing) {
+                const timing = currentData.timing;
+                
+                document.getElementById('retrievalTime').textContent = `${timing.retrieval_time_seconds}s`;
+                document.getElementById('generationTime').textContent = `${timing.generation_time_seconds}s`;
+                document.getElementById('totalTime').textContent = `${timing.total_time_seconds}s`;
+                
+                timingElement.style.display = 'block';
+            } else {
+                timingElement.style.display = 'none';
+            }
         }
     </script>
 </body>
