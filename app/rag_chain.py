@@ -157,7 +157,7 @@ def answer_question(
                 "page_end": doc.get("page_end"),
                 "section_title": doc.get("section_title"),
                 "score": doc.get("score"),
-                "content_preview": doc.get("content", "")[:200] + "..." if len(doc.get("content", "")) > 200 else doc.get("content", ""),
+                "content_preview": doc.get("content", ""),  # Full content for UI display
             }
             for doc in retrieved_docs
         ]

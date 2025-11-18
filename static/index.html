@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG Chatbot - Document Q&A</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .chat-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .input-section {
+            padding: 30px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 15px 20px;
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        input[type="number"] {
+            width: 100px;
+            padding: 15px 20px;
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            font-size: 1rem;
+        }
+
+        button {
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .results-section {
+            padding: 30px;
+            display: none;
+        }
+
+        .results-section.active {
+            display: block;
+        }
+
+        .question-display {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            border-left: 4px solid #667eea;
+        }
+
+        .question-display h3 {
+            color: #495057;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .question-display p {
+            color: #212529;
+            font-size: 1.1rem;
+            font-weight: 500;
+        }
+
+        .answer-display {
+            background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+            padding: 25px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            border: 2px solid #667eea30;
+        }
+
+        .answer-display h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+        }
+
+        .answer-display p {
+            color: #212529;
+            font-size: 1.05rem;
+            line-height: 1.7;
+        }
+
+        .sources-section h3 {
+            color: #495057;
+            margin-bottom: 20px;
+            font-size: 1.2rem;
+        }
+
+        .source-navigation {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 12px;
+        }
+
+        .source-counter {
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .nav-buttons button {
+            padding: 10px 20px;
+            font-size: 0.9rem;
+        }
+
+        .source-card {
+            background: white;
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+        }
+
+        .source-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f8f9fa;
+        }
+
+        .source-meta {
+            flex: 1;
+        }
+
+        .source-file {
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 8px;
+            font-size: 1.05rem;
+        }
+
+        .source-details {
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+
+        .source-score {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .source-content {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            color: #212529;
+            line-height: 1.7;
+            font-size: 0.95rem;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid #f5c6cb;
+            margin-bottom: 20px;
+        }
+
+        .label {
+            display: block;
+            margin-bottom: 5px;
+            color: #495057;
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📚 RAG Chatbot</h1>
+            <p>Ask questions about your documents</p>
+        </div>
+
+        <div class="chat-container">
+            <div class="input-section">
+                <div class="input-group">
+                    <div style="flex: 1;">
+                        <label class="label">Your Question</label>
+                        <input type="text" id="questionInput" placeholder="Ask a question about your documents..." />
+                    </div>
+                    <div>
+                        <label class="label">Top K</label>
+                        <input type="number" id="topKInput" value="5" min="1" max="20" />
+                    </div>
+                    <div style="display: flex; align-items: flex-end;">
+                        <button id="askButton" onclick="askQuestion()">Ask</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="loadingSection" class="loading" style="display: none;">
+                <div class="spinner"></div>
+                <p>Searching documents and generating answer...</p>
+            </div>
+
+            <div id="errorSection" style="display: none; padding: 30px;">
+                <div class="error" id="errorMessage"></div>
+            </div>
+
+            <div id="resultsSection" class="results-section">
+                <div class="question-display">
+                    <h3>Question</h3>
+                    <p id="questionDisplay"></p>
+                </div>
+
+                <div class="answer-display">
+                    <h3>💡 Answer</h3>
+                    <p id="answerDisplay"></p>
+                </div>
+
+                <div class="sources-section">
+                    <h3>📄 Source Documents (<span id="totalSources">0</span>)</h3>
+                    
+                    <div class="source-navigation">
+                        <div class="source-counter">
+                            Source <span id="currentSource">1</span> of <span id="totalSourcesNav">0</span>
+                        </div>
+                        <div class="nav-buttons">
+                            <button onclick="previousSource()">← Previous</button>
+                            <button onclick="nextSource()">Next →</button>
+                        </div>
+                    </div>
+
+                    <div id="sourceDisplay"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentData = null;
+        let currentSourceIndex = 0;
+
+        // Allow Enter key to submit
+        document.getElementById('questionInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                askQuestion();
+            }
+        });
+
+        async function askQuestion() {
+            const question = document.getElementById('questionInput').value.trim();
+            const topK = parseInt(document.getElementById('topKInput').value);
+
+            if (!question) {
+                alert('Please enter a question');
+                return;
+            }
+
+            // Show loading
+            document.getElementById('loadingSection').style.display = 'block';
+            document.getElementById('resultsSection').classList.remove('active');
+            document.getElementById('errorSection').style.display = 'none';
+            document.getElementById('askButton').disabled = true;
+
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        question: question,
+                        top_k: topK
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                currentData = data;
+                currentSourceIndex = 0;
+
+                displayResults();
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('errorMessage').textContent = 
+                    'Error: ' + error.message + '. Make sure the server is running and you have set your OPENAI_API_KEY.';
+                document.getElementById('errorSection').style.display = 'block';
+            } finally {
+                document.getElementById('loadingSection').style.display = 'none';
+                document.getElementById('askButton').disabled = false;
+            }
+        }
+
+        function displayResults() {
+            if (!currentData) return;
+
+            // Display question
+            document.getElementById('questionDisplay').textContent = currentData.question;
+
+            // Display answer
+            document.getElementById('answerDisplay').textContent = currentData.answer;
+
+            // Display sources count
+            const numSources = currentData.sources.length;
+            document.getElementById('totalSources').textContent = numSources;
+            document.getElementById('totalSourcesNav').textContent = numSources;
+
+            // Display current source
+            displayCurrentSource();
+
+            // Show results section
+            document.getElementById('resultsSection').classList.add('active');
+        }
+
+        function displayCurrentSource() {
+            if (!currentData || currentData.sources.length === 0) return;
+
+            const source = currentData.sources[currentSourceIndex];
+            document.getElementById('currentSource').textContent = currentSourceIndex + 1;
+
+            const sourceHTML = `
+                <div class="source-card">
+                    <div class="source-header">
+                        <div class="source-meta">
+                            <div class="source-file">📄 ${source.file_name}</div>
+                            <div class="source-details">
+                                ${source.page_start === source.page_end 
+                                    ? `Page ${source.page_start}` 
+                                    : `Pages ${source.page_start}-${source.page_end}`}
+                                ${source.section_title ? ` • ${source.section_title}` : ''}
+                            </div>
+                        </div>
+                        <div class="source-score">
+                            Score: ${(source.score * 100).toFixed(1)}%
+                        </div>
+                    </div>
+                    <div class="source-content">${source.content_preview}</div>
+                </div>
+            `;
+
+            document.getElementById('sourceDisplay').innerHTML = sourceHTML;
+        }
+
+        function nextSource() {
+            if (!currentData || currentData.sources.length === 0) return;
+            
+            currentSourceIndex = (currentSourceIndex + 1) % currentData.sources.length;
+            displayCurrentSource();
+        }
+
+        function previousSource() {
+            if (!currentData || currentData.sources.length === 0) return;
+            
+            currentSourceIndex = (currentSourceIndex - 1 + currentData.sources.length) % currentData.sources.length;
+            displayCurrentSource();
+        }
+    </script>
+</body>
+</html>

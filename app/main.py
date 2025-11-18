@@ -6,13 +6,15 @@ from typing import Optional
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from .ingestion import ingest_pdf_bytes, ingest_folder
 from .retrieval import query_docs
 from .rag_chain import answer_question
-from .config import RAW_FILES_PATH
+from .config import RAW_FILES_PATH, BASE_DIR
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -49,6 +51,20 @@ app = FastAPI(
     title="Financial RAG API with Milvus",
     lifespan=lifespan,
 )
+
+# Mount static files
+static_path = BASE_DIR / "static"
+if static_path.exists():
+    app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
+
+
+@app.get("/")
+async def root():
+    """Serve the main HTML interface"""
+    static_path = BASE_DIR / "static" / "index.html"
+    if static_path.exists():
+        return FileResponse(str(static_path))
+    return {"message": "RAG Chatbot API", "docs": "/docs"}
 
 
 @app.get("/health")
