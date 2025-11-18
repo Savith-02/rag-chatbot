@@ -10,6 +10,7 @@ dependencies = [
     "langchain-core>=0.3.79",
     "langchain-huggingface>=0.3.1",
     "langchain-milvus>=0.2.1",
+    "langchain-openai>=1.0.3",
     "numpy<2",
     "pymilvus[model]>=2.6.3",
     "pypdf>=6.2.0",

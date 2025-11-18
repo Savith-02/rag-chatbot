@@ -11,6 +11,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from .ingestion import ingest_pdf_bytes, ingest_folder
 from .retrieval import query_docs
+from .rag_chain import answer_question
 from .config import RAW_FILES_PATH
 
 logging.basicConfig(level=logging.INFO)
@@ -133,6 +134,30 @@ async def query(req: QueryRequest):
         file_name_filter=req.file_name,
     )
     return {"results": results}
+
+
+class ChatRequest(BaseModel):
+    question: str
+    top_k: int = 5
+    file_name: Optional[str] = None
+
+
+@app.post("/chat")
+async def chat(req: ChatRequest):
+    """
+    RAG endpoint: Answer questions using retrieved context and LLM.
+    This endpoint retrieves relevant documents and generates an answer using OpenAI's LLM.
+    """
+    try:
+        result = answer_question(
+            question=req.question,
+            top_k=req.top_k,
+            file_name_filter=req.file_name,
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Error in chat endpoint: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/ingestion_status")
