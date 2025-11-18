@@ -139,7 +139,7 @@ async def trigger_ingestion():
 
 
 class QueryRequest(BaseModel):
-    query: str
+    question: str
     top_k: int = 5
     file_name: Optional[str] = None
 
@@ -151,7 +151,7 @@ async def query(req: QueryRequest):
     Uses dense vector search (semantic similarity) with BGE-large-en embeddings.
     """
     results = query_docs(
-        query=req.query,
+        query=req.question,
         top_k=req.top_k,
         file_name_filter=req.file_name,
     )

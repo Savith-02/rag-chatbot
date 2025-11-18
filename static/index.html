@@ -86,6 +86,22 @@
             color: white;
         }
 
+        select {
+            padding: 15px 20px;
+            border: 2px solid #2a2a2a;
+            border-radius: 12px;
+            font-size: 1rem;
+            background: #1a1a1a;
+            color: white;
+            cursor: pointer;
+            transition: border-color 0.3s;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #ff8c00;
+        }
+
         button {
             padding: 15px 30px;
             background: linear-gradient(135deg, #ff8c00 0%, #ff6600 100%);
@@ -298,14 +314,27 @@
 
         <div class="chat-container">
             <div class="input-section">
-                <div class="input-group">
+                <div class="input-group" style="margin-bottom: 15px;">
+                    <div>
+                        <label class="label">Mode</label>
+                        <select id="modeSelect">
+                            <option value="chat">Chat</option>
+                            <option value="query">Query</option>
+                        </select>
+                    </div>
                     <div style="flex: 1;">
-                        <label class="label">Your Question</label>
-                        <input type="text" id="questionInput" placeholder="Ask a question about your documents..." />
+                        <label class="label">File Name (Optional)</label>
+                        <input type="text" id="fileNameInput" placeholder="Enter specific file name..." />
                     </div>
                     <div>
                         <label class="label">Top K</label>
                         <input type="number" id="topKInput" value="5" min="1" max="20" />
+                    </div>
+                </div>
+                <div class="input-group">
+                    <div style="flex: 1;">
+                        <label class="label">Your Question</label>
+                        <input type="text" id="questionInput" placeholder="Ask a question about your documents..." />
                     </div>
                     <div style="display: flex; align-items: flex-end;">
                         <button id="askButton" onclick="askQuestion()">Ask</button>
@@ -366,6 +395,8 @@
         async function askQuestion() {
             const question = document.getElementById('questionInput').value.trim();
             const topK = parseInt(document.getElementById('topKInput').value);
+            const mode = document.getElementById('modeSelect').value;
+            const fileName = document.getElementById('fileNameInput').value.trim();
 
             if (!question) {
                 alert('Please enter a question');
@@ -379,15 +410,26 @@
             document.getElementById('askButton').disabled = true;
 
             try {
-                const response = await fetch('/chat', {
+                // Determine endpoint based on mode
+                const endpoint = mode === 'chat' ? '/chat' : '/query';
+                
+                // Build request body
+                const requestBody = {
+                    question: question,
+                    top_k: topK
+                };
+                
+                // Add file_name if provided
+                if (fileName) {
+                    requestBody.file_name = fileName;
+                }
+
+                const response = await fetch(endpoint, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({
-                        question: question,
-                        top_k: topK
-                    })
+                    body: JSON.stringify(requestBody)
                 });
 
                 if (!response.ok) {
@@ -413,14 +455,27 @@
         function displayResults() {
             if (!currentData) return;
 
-            // Display question
-            document.getElementById('questionDisplay').textContent = currentData.question;
+            // Handle different response formats (chat vs query)
+            const isQueryMode = Array.isArray(currentData.results);
+            const sources = isQueryMode ? currentData.results : currentData.sources;
 
-            // Display answer
-            document.getElementById('answerDisplay').textContent = currentData.answer;
+            // Display question (only for chat mode)
+            const questionElement = document.getElementById('questionDisplay').parentElement;
+            
+            questionElement.style.display = 'none';
+        
+
+            // Display answer (only for chat mode)
+            const answerElement = document.getElementById('answerDisplay').parentElement;
+            if (isQueryMode) {
+                answerElement.style.display = 'none';
+            } else {
+                answerElement.style.display = 'block';
+                document.getElementById('answerDisplay').textContent = currentData.answer;
+            }
 
             // Display sources count
-            const numSources = currentData.sources.length;
+            const numSources = sources ? sources.length : 0;
             document.getElementById('totalSources').textContent = numSources;
             document.getElementById('totalSourcesNav').textContent = numSources;
 
@@ -432,10 +487,15 @@
         }
 
         function displayCurrentSource() {
-            if (!currentData || currentData.sources.length === 0) return;
+            // Handle both chat and query response formats
+            const sources = currentData.results || currentData.sources;
+            if (!currentData || !sources || sources.length === 0) return;
 
-            const source = currentData.sources[currentSourceIndex];
+            const source = sources[currentSourceIndex];
             document.getElementById('currentSource').textContent = currentSourceIndex + 1;
+
+            // Query mode uses 'content', chat mode uses 'content_preview'
+            const content = source.content_preview || source.content;
 
             const sourceHTML = `
                 <div class="source-card">
@@ -453,7 +513,7 @@
                             Score: ${(source.score * 100).toFixed(1)}%
                         </div>
                     </div>
-                    <div class="source-content">${source.content_preview}</div>
+                    <div class="source-content">${content}</div>
                 </div>
             `;
 
@@ -461,16 +521,18 @@
         }
 
         function nextSource() {
-            if (!currentData || currentData.sources.length === 0) return;
+            const sources = currentData.results || currentData.sources;
+            if (!currentData || !sources || sources.length === 0) return;
             
-            currentSourceIndex = (currentSourceIndex + 1) % currentData.sources.length;
+            currentSourceIndex = (currentSourceIndex + 1) % sources.length;
             displayCurrentSource();
         }
 
         function previousSource() {
-            if (!currentData || currentData.sources.length === 0) return;
+            const sources = currentData.results || currentData.sources;
+            if (!currentData || !sources || sources.length === 0) return;
             
-            currentSourceIndex = (currentSourceIndex - 1 + currentData.sources.length) % currentData.sources.length;
+            currentSourceIndex = (currentSourceIndex - 1 + sources.length) % sources.length;
             displayCurrentSource();
         }
     </script>

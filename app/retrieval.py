@@ -36,7 +36,8 @@ def query_docs(
     
     kwargs = {}
     if file_name_filter:
-        kwargs["filter"] = f'file_name == "{file_name_filter}"'
+        # Use 'expr' for Milvus filter expression
+        kwargs["expr"] = f'file_name == "{file_name_filter}"'
     
     docs_and_scores = vectorstore.similarity_search_with_score(
         query, k=top_k, **kwargs

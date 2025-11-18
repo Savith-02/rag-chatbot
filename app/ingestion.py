@@ -66,12 +66,15 @@ def ingest_pdf_bytes(file_bytes: bytes, file_name: str) -> dict:
             pages_with_no_text += 1
             continue
 
-        chunks = split_into_chunks(page_text, chunk_size=600, chunk_overlap=80)
+        chunks = split_into_chunks(page_text, chunk_size=1200, chunk_overlap=150)
 
         for chunk_idx, chunk_text in enumerate(chunks):
+            # Prepend filename to chunk content
+            chunk_with_filename = f"[File: {file_name}]\n{chunk_text}"
+            
             docs.append(
                 Document(
-                    page_content=chunk_text,
+                    page_content=chunk_with_filename,
                     metadata={
                         "chunk_id": f"{file_name}_{page_num}_{chunk_idx}",
                         "source": file_name,      
