@@ -324,7 +324,9 @@
                     </div>
                     <div style="flex: 1;">
                         <label class="label">File Name (Optional)</label>
-                        <input type="text" id="fileNameInput" placeholder="Enter specific file name..." />
+                        <select id="fileNameSelect">
+                            <option value="">All Files</option>
+                        </select>
                     </div>
                     <div>
                         <label class="label">Top K</label>
@@ -385,6 +387,11 @@
         let currentData = null;
         let currentSourceIndex = 0;
 
+        // Load processed files on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadProcessedFiles();
+        });
+
         // Allow Enter key to submit
         document.getElementById('questionInput').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
@@ -392,11 +399,36 @@
             }
         });
 
+        async function loadProcessedFiles() {
+            try {
+                const response = await fetch('/files');
+                if (response.ok) {
+                    const data = await response.json();
+                    const select = document.getElementById('fileNameSelect');
+                    
+                    // Clear existing options except "All Files"
+                    select.innerHTML = '<option value="">All Files</option>';
+                    
+                    // Add file options
+                    data.files.forEach(fileName => {
+                        const option = document.createElement('option');
+                        option.value = fileName;
+                        option.textContent = fileName;
+                        select.appendChild(option);
+                    });
+                } else {
+                    console.warn('Could not load processed files list');
+                }
+            } catch (error) {
+                console.warn('Error loading processed files:', error);
+            }
+        }
+
         async function askQuestion() {
             const question = document.getElementById('questionInput').value.trim();
             const topK = parseInt(document.getElementById('topKInput').value);
             const mode = document.getElementById('modeSelect').value;
-            const fileName = document.getElementById('fileNameInput').value.trim();
+            const fileName = document.getElementById('fileNameSelect').value;
 
             if (!question) {
                 alert('Please enter a question');

@@ -196,3 +196,31 @@ async def ingestion_status():
             "interval_seconds": 45,
         }
     return {"status": "inactive"}
+
+
+@app.get("/files")
+async def get_processed_files():
+    """
+    Get the list of all processed files in the vector database.
+    """
+    try:
+        from .vectorstore import get_milvus_client, COLLECTION_NAME
+        
+        client = get_milvus_client()
+        
+        # Query to get distinct file names
+        results = client.query(
+            collection_name=COLLECTION_NAME,
+            filter="",
+            output_fields=["file_name"],
+            limit=1000  # Adjust as needed
+        )
+        
+        # Extract unique file names
+        file_names = list(set(result["file_name"] for result in results if result.get("file_name")))
+        file_names.sort()  # Sort alphabetically
+        
+        return {"files": file_names}
+    except Exception as e:
+        logger.error(f"Error getting processed files: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
