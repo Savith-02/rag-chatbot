@@ -4,7 +4,7 @@ import logging
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List, Dict, Any
 import pandas as pd
 
 logger = logging.getLogger(__name__)
@@ -22,6 +22,7 @@ COLUMNS = [
     "Generation_Time_Seconds",
     "Total_Time_Seconds",
     "Num_Documents_Retrieved",
+    "Retrieved_Documents",
     "Status"
 ]
 
@@ -56,7 +57,8 @@ def log_rag_performance(
     retrieval_time: float,
     generation_time: float,
     num_documents_retrieved: int,
-    status: str = "success"
+    status: str = "success",
+    retrieved_docs: Optional[List[Dict[str, Any]]] = None
 ) -> None:
     """
     Log RAG performance data to the spreadsheet.
@@ -68,10 +70,18 @@ def log_rag_performance(
         generation_time: Time taken for answer generation (seconds)
         num_documents_retrieved: Number of documents retrieved
         status: Status of the operation (success, error, no_documents_found)
+        retrieved_docs: List of retrieved document dictionaries for logging
     """
     try:
         timestamp = datetime.now().isoformat()
         total_time = retrieval_time + generation_time
+        
+        # Format retrieved documents for logging (file names only)
+        if retrieved_docs:
+            file_names = [doc.get("file_name", "Unknown") for doc in retrieved_docs]
+            retrieved_docs_text = "\n".join(file_names)
+        else:
+            retrieved_docs_text = "No documents retrieved"
         
         # Create new record
         new_record = {
@@ -82,6 +92,7 @@ def log_rag_performance(
             "Generation_Time_Seconds": round(generation_time, 3),
             "Total_Time_Seconds": round(total_time, 3),
             "Num_Documents_Retrieved": num_documents_retrieved,
+            "Retrieved_Documents": retrieved_docs_text[:1000],  # Limit retrieved docs length
             "Status": status
         }
         

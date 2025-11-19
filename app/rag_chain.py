@@ -146,7 +146,8 @@ def answer_question(
             retrieval_time=retrieval_time,
             generation_time=0,
             num_documents_retrieved=0,
-            status="no_documents_found"
+            status="no_documents_found",
+            retrieved_docs=[]
         )
         
         return {
@@ -182,7 +183,8 @@ def answer_question(
             retrieval_time=retrieval_time,
             generation_time=generation_time,
             num_documents_retrieved=len(retrieved_docs),
-            status="success"
+            status="success",
+            retrieved_docs=retrieved_docs
         )
         
         # Format sources for response
@@ -221,7 +223,8 @@ def answer_question(
             retrieval_time=retrieval_time,
             generation_time=generation_time,
             num_documents_retrieved=len(retrieved_docs),
-            status="error"
+            status="error",
+            retrieved_docs=retrieved_docs
         )
         
         logger.error(f"Error generating answer: {str(e)}", exc_info=True)
