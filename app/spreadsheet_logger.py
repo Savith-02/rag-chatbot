@@ -22,7 +22,11 @@ COLUMNS = [
     "Generation_Time_Seconds",
     "Total_Time_Seconds",
     "Num_Documents_Retrieved",
-    "Retrieved_Documents",
+    "Chunk_1",
+    "Chunk_2", 
+    "Chunk_3",
+    "Chunk_4",
+    "Chunk_5",
     "Status"
 ]
 
@@ -76,12 +80,11 @@ def log_rag_performance(
         timestamp = datetime.now().isoformat()
         total_time = retrieval_time + generation_time
         
-        # Format retrieved documents for logging (file names only)
+        # Sort retrieved documents by score (highest to lowest)
         if retrieved_docs:
-            file_names = [doc.get("file_name", "Unknown") for doc in retrieved_docs]
-            retrieved_docs_text = "\n".join(file_names)
+            sorted_docs = sorted(retrieved_docs, key=lambda x: x.get("score", 0), reverse=True)
         else:
-            retrieved_docs_text = "No documents retrieved"
+            sorted_docs = []
         
         # Create new record
         new_record = {
@@ -92,9 +95,27 @@ def log_rag_performance(
             "Generation_Time_Seconds": round(generation_time, 3),
             "Total_Time_Seconds": round(total_time, 3),
             "Num_Documents_Retrieved": num_documents_retrieved,
-            "Retrieved_Documents": retrieved_docs_text[:1000],  # Limit retrieved docs length
             "Status": status
         }
+        
+        # Add chunk data for up to 5 chunks
+        for i in range(5):
+            chunk_num = i + 1
+            chunk_key = f"Chunk_{chunk_num}"
+            
+            if i < len(sorted_docs):
+                doc = sorted_docs[i]
+                file_name = doc.get("file_name", "Unknown")
+                page_start = doc.get("page_start", "N/A")
+                chunk_id = doc.get("chunk_id", "N/A")
+                score = doc.get("score", 0)
+                content = doc.get("content", "")
+                
+                # Format chunk information in separate lines including full content
+                chunk_info = f"File: {file_name}\nPage: {page_start}\nChunk ID: {chunk_id}\nScore: {score:.4f}\n\nContent:\n{content}"
+                new_record[chunk_key] = chunk_info
+            else:
+                new_record[chunk_key] = ""
         
         # Read existing data
         if SPREADSHEET_FILE.exists():
