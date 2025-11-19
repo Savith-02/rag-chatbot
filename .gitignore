@@ -4,3 +4,4 @@ notes.md
 *__pycache__
 processed_files.txt
 *.md
+logs/
